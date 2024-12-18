@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
@@ -60,18 +61,23 @@ def visualize(roadgraph: np.ndarray,
     ax.set_ylabel("Y Position")
     ax.set_title(f"Roadgraph and Agents (Batch {batch_index})")
     ax.legend()
+    ax.axis('equal')
     ax.grid(True)
 
     return fig
 
 
 if __name__ == "__main__":
-    roadgraph = np.load("roadgraph.npy")
-    agents = np.load("agents.npy")
+    # Set directory
+    dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../data/processed")
+    os.makedirs(dir, exist_ok=True)
+
+    roadgraph = np.load(os.path.join(dir, "roadgraph.npy"))
+    agents = np.load(os.path.join(dir, "agents.npy"))
 
     # Plot the first batch
     fig = visualize(roadgraph, agents, batch_index=10)
-        
+
     # Save the figure to a file instead of showing it
-    plt.savefig("./visualize.png")
+    plt.savefig(os.path.join(dir, "visualize_batch.png"))
     plt.close(fig)

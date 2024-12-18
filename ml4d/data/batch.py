@@ -1,7 +1,7 @@
 import jax
-import jax.numpy as jnp
 import numpy as np
 from jax import random
+import os
 
 from ml4d.data.agents import generate_agents
 from ml4d.data.roadgraph import generate_roadgraph
@@ -50,6 +50,10 @@ def generate_batch(batch_size: int = 128) -> tuple[jax.Array, jax.Array]:
 if __name__ == "__main__":
     roadgraph, agents = generate_batch(batch_size=128)
     
+    # Set directory
+    dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../data/processed")
+    os.makedirs(dir, exist_ok=True)
+    
     # Save the generated data
-    np.save("./roadgraph.npy", np.array(roadgraph))
-    np.save("./agents.npy", np.array(agents))
+    np.save(os.path.join(dir, "roadgraph.npy"), np.array(roadgraph))
+    np.save(os.path.join(dir, "agents.npy"), np.array(agents))
