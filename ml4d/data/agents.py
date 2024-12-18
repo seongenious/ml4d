@@ -8,7 +8,7 @@ from ml4d.utils.geometry import compute_pairwise_overlaps
 
 def generate_agents(key: jax.random.PRNGKey,
                     roadgraph: jax.Array,
-                    num_objects: int = 32,
+                    num_objects: int = 32, 
                     noise: tuple = (0.5, 0.5, deg2rad(5.0)),
                     speed: tuple = (0, kph2mps(50)),
                     delta: tuple = (-deg2rad(10.0), deg2rad(10.0)),

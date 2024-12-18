@@ -1,9 +1,8 @@
-import os
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 
-from ml4d.utils.geometry import agent2bbox, compute_pairwise_overlaps
+from ml4d.utils.geometry import agent2bbox
 
 
 def visualize(roadgraph: np.ndarray, 
@@ -65,19 +64,3 @@ def visualize(roadgraph: np.ndarray,
     ax.grid(True)
 
     return fig
-
-
-if __name__ == "__main__":
-    # Set directory
-    dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../data/processed")
-    os.makedirs(dir, exist_ok=True)
-
-    roadgraph = np.load(os.path.join(dir, "roadgraph.npy"))
-    agents = np.load(os.path.join(dir, "agents.npy"))
-
-    # Plot the first batch
-    fig = visualize(roadgraph, agents, batch_index=10)
-
-    # Save the figure to a file instead of showing it
-    plt.savefig(os.path.join(dir, "visualize_batch.png"))
-    plt.close(fig)
