@@ -4,47 +4,40 @@
 
 ---
 
-## **Project Setup and Execution**
+## **Overview**
 
-### **Prerequisites**
+## **Installation**
 
-Ensure the following are installed:  
+### **Quick Start**
 
-- **Docker**: [Installation Guide](https://docs.docker.com/engine/install/)  
-- **NVIDIA Container Toolkit** (for GPU support): [Installation Guide](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html)  
-
----
-
-### **Start with Docker Image**
-
-To build the Docker image, run:
+**ML4D** can be installed via pip using the following command:
 
 ```bash
-./docker.sh build
+pip install --upgrade pip
+pip install git+https://github.com/seongenious/###
 ```
 
-To start the container and launch Jupyter Notebook:
+### **Developer Guide**
+
+Clone the repository:
 
 ```bash
-./docker.sh start
+git clone https://github.com/seongenious/ml4d.git
 ```
 
-Access Jupyter Notebook at:
+Build the docker image, then start and open a shell inside the running container:
 
 ```bash
-http://localhost:8888
+./docker.sh build | start | exec
 ```
 
-Copy the **access token** displayed in the terminal to log in.
-
-To open a shell inside the running container:
-
-```bash
-./docker.sh exec
-```
-
-To stop and clean up the container:
+Stop and clean up the container:
 
 ```bash
 ./docker.sh remove
 ```
+
+
+## **Getting Started**
+
+## **Contact**

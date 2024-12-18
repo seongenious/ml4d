@@ -10,8 +10,12 @@ ENV PYTHONUNBUFFERED=1 \
 WORKDIR /workspace
 
 # Install required system packages
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3.10 python3.10-dev python3-pip \
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    python3.10 \
+    python3.10-venv \
+    python3.10-dev \
+    python3-pip \
     build-essential \
     git \
     wget \
@@ -22,6 +26,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     vim tmux nano \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
+
+RUN apt-get update && apt-get install -y \
+    libgl1-mesa-glx \
+    libgl1-mesa-dri \
+    xvfb
+
+# Setup Python3 
+RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.10 1 && \
+    update-alternatives --install /usr/bin/pip pip /usr/bin/pip3 1
+
+# Setup cuda 
+ENV LD_LIBRARY_PATH /usr/local/cuda/lib64:${LD_LIBRARY_PATH}
+ENV PATH /usr/local/cuda/bin:${PATH}
 
 # Upgrade pip, setuptools, and wheel
 RUN pip3 install --upgrade pip setuptools wheel
@@ -47,4 +64,5 @@ COPY . .
 EXPOSE 8888
 
 # Default command to run the project
-CMD ["/bin/bash"]
+# CMD ["/bin/bash"]
+CMD ["bash", "-c", "cd /mnt && exec bash"]
