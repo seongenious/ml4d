@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 from ml4d.data.agents import generate_agents
 from ml4d.data.roadgraph import generate_roadgraph
 from ml4d.data.visualize import visualize
-from ml4d.utils.transform import transform
+from ml4d.utils.transform import *
 
 
 # Suppress JAX logs below WARNING
@@ -74,9 +74,10 @@ def generate_batch(batch_size: int = 128) -> tuple[jax.Array, jax.Array]:
     logging.info("Agents generated.")
 
     # Transform with respect to the first agent
-    logging.info("Transform with respect to the first agent...")
+    # logging.info("Transform with respect to the first agent...")
     # agents, roadgraph = transform(agents, roadgraph)
-    logging.info("Transform completed.")
+    # logging.info("Transform completed.")
+    transform_agents(agents)
 
     return roadgraph, agents
 
