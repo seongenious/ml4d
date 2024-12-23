@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 from ml4d.data.agents import generate_agents
 from ml4d.data.roadgraph import generate_roadgraph
 from ml4d.data.visualize import visualize
+from ml4d.data.teacher import generate_keeping_policy
 from ml4d.utils.transform import transform_roadgraph, transform_agents
 
 
@@ -79,7 +80,10 @@ def generate_batch(batch_size: int = 128) -> tuple[jax.Array, jax.Array]:
     agents = transform_agents(agents)
     logging.info("Transform completed.")
     
-    return roadgraph, agents
+    # Generate keeping policy
+    policy = generate_keeping_policy(roadgraph, agents)
+    
+    return roadgraph, agents, policy
 
 
 def main():
@@ -98,7 +102,7 @@ def main():
     # Generate data
     logging.info(f"Starting batch generation with batch size: {args.batch_size}")
     start_time = time.time()
-    roadgraph, agents = generate_batch(batch_size=args.batch_size)
+    roadgraph, agents, policy = generate_batch(batch_size=args.batch_size)
     elapsed_time = time.time() - start_time
     logging.info(f"Batch generation completed in {elapsed_time:.2f} seconds.")
 
@@ -110,13 +114,14 @@ def main():
     # Save the generated data
     np.save(os.path.join(save_dir, "roadgraph.npy"), np.array(roadgraph))
     np.save(os.path.join(save_dir, "agents.npy"), np.array(agents))
+    np.save(os.path.join(save_dir, "policy.npy"), np.array(policy))
     logging.info(f"Data saved to: {save_dir}")
 
     if args.debug:
         # Plot the first batch
         key = random.PRNGKey(int(time.time()))
         batch_idx = random.randint(key, shape=(), minval=0, maxval=args.batch_size-1)
-        fig = visualize(roadgraph, agents, batch_index=batch_idx)
+        fig = visualize(roadgraph, agents, batch_index=2)
 
         # Save the figure to a file instead of showing it
         plt.savefig(os.path.join(save_dir, f"batch_{batch_idx}.png"))
