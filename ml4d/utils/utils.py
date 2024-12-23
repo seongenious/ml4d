@@ -2,7 +2,7 @@ import jax
 import jax.numpy as jnp
 
 
-def get_batched_index(agents: jax.Array) -> jax.Array:
+def get_batched_ego_index(agents: jax.Array) -> jax.Array:
     """
     Returns batched ego agent index
 
@@ -24,4 +24,4 @@ def get_batched_index(agents: jax.Array) -> jax.Array:
 
     # Replace indices greater than or equal to num_objects with -1 (no valid agent)
     min_indices = jnp.where(min_indices < num_objects, min_indices, -1)
-    return min_indices.reshape(-1, 1)
+    return min_indices.reshape(-1,)
