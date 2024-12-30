@@ -1,8 +1,11 @@
+import jax
+import jax.numpy as jnp
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 
 from ml4d.utils.geometry import agent2bbox
+from ml4d.utils.unit import mps2kph
 
 
 RED = (0.9961, 0.4275, 0.451)
@@ -17,6 +20,7 @@ BLACK = (0, 0, 0)
 
 def visualize(roadgraph: np.ndarray, 
               agents: np.ndarray, 
+              policy: np.ndarray,
               batch_index: int = 0):
     """
     Plots the roadgraph and agent positions for a given batch index.
@@ -32,17 +36,10 @@ def visualize(roadgraph: np.ndarray,
     Returns:
         None
     """    
-    # Extract the specific batch
-    single_roadgraph = roadgraph[batch_index]  # (num_lanes, num_points, 2)
-
-    # Generate rectangle corners for each agent
-    # Returned shape: (num_objects, 4, 2)
-    agent_corners = agent2bbox(agents[batch_index:batch_index+1])  # (1, num_objects, 4, 2)
-    agent_corners = agent_corners[0]
-
     fig, ax = plt.subplots(figsize=(8, 6))
-
+    
     # Plot each lane of the roadgraph
+    single_roadgraph = roadgraph[batch_index]  # (num_lanes, num_points, 2)
     num_lanes = single_roadgraph.shape[0]
     for lane_idx in range(num_lanes):
         lane_points = single_roadgraph[lane_idx]
@@ -54,9 +51,15 @@ def visualize(roadgraph: np.ndarray,
                 linestyle='--',
                 label=f"Lane {lane_idx}")
 
+    # Generate rectangle corners for each agent
+    # Returned shape: (num_objects, 4, 2)
+    batch_agent = agents[batch_index:batch_index+1]
+    agent_corners = agent2bbox(batch_agent)  # (1, num_objects, 4, 2)
+    agent_corners = agent_corners[0]
+    
     # Draw each agent as a polygon
-    batched_agent = agents[batch_index][:, -1]
-    indices = np.where(batched_agent == 1)[0]
+    agent = batch_agent[0][:, -1]
+    indices = np.where(agent == 1)[0]
     ego_index = np.where(indices.size > 0, indices[0], -1)
 
     for i, ac in enumerate(agent_corners):
@@ -75,6 +78,47 @@ def visualize(roadgraph: np.ndarray,
             linestyle=linestyle
         )
         ax.add_patch(polygon)
+        
+        # center of corner points
+        center_x = ac[:, 0].mean()
+        center_y = ac[:, 1].mean()
+
+        # Display speed
+        speed = mps2kph(batch_agent[0, i, 4])  # speed = agents[..., 4]
+        ax.text(center_x, center_y, f"{speed:.2f}", 
+                color=edgecolor, 
+                ha='center', va='center',
+                fontsize=7)
+    
+    # Apply policy
+    batch_policy = policy[batch_index:batch_index+1]
+    batch_agent = simulate(batch_agent, batch_policy, dt=1.0)
+    agent_corners = agent2bbox(batch_agent)  # (1, num_objects, 4, 2)
+    agent_corners = agent_corners[0]
+    
+    # Draw each agent as a polygon
+    agent = batch_agent[0][:, -1]
+    indices = np.where(agent == 1)[0]
+    ego_index = np.where(indices.size > 0, indices[0], -1)
+
+    for i, ac in enumerate(agent_corners):
+        if agents[batch_index][i, -1] == 0: continue
+        
+        edgecolor = GREEN if i == ego_index else RED
+        edgecolor = GRAY
+        linestyle = '-'
+        
+        # ac is (4, 2) array of corner points
+        polygon = patches.Polygon(
+            ac, 
+            closed=True, 
+            edgecolor=edgecolor, 
+            facecolor='none', 
+            linewidth=1.0, 
+            linestyle=linestyle
+        )
+        ax.add_patch(polygon)
+    
 
     ax.set_xlabel("X Position")
     ax.set_ylabel("Y Position")
@@ -84,3 +128,22 @@ def visualize(roadgraph: np.ndarray,
     ax.grid(True)
 
     return fig
+
+
+def simulate(agents: jax.Array, policy: jax.Array, dt: float = 0.1) -> jax.Array:
+    WHEELBASE = 3.0
+    
+    c, s = agents[..., 2], agents[..., 3]
+    theta = jnp.arctan2(s, c)
+
+    agents = agents.at[..., 0].set(agents[..., 0] + agents[..., 4] * c * dt)
+    agents = agents.at[..., 1].set(agents[..., 1] + agents[..., 4] * s * dt)
+    
+    theta = theta + agents[..., 4] / WHEELBASE * jnp.tan(policy[..., 0]) * dt
+    agents = agents.at[..., 2].set(jnp.cos(theta))
+    agents = agents.at[..., 3].set(jnp.sin(theta))
+    
+    agents = agents.at[..., 4].set(
+        jnp.maximum(0., agents[..., 4] + policy[..., 1] * dt))
+    
+    return agents

@@ -20,18 +20,19 @@ def pure_pursuit(state: jax.Array,
     Returns:
         jnp.float_: steering angle
     """
+    # Get state and extend dimension
+    x, y, v = state[..., 0], state[..., 1], state[..., 4]
+    yaw = jnp.arctan2(state[..., 3], state[..., 2])
+    
     # Compute feedback steering angle
-    print(state.shape)
-    x, y, cos_h, sin_h, v = state[..., 0], state[..., 1], state[..., 2], state[..., 3], state[..., 4]
-    yaw = jnp.arctan2(sin_h, cos_h)
-    
-    print(centerline.shape)
     distances = jnp.sqrt(
-      (centerline[..., 0] - x) ** 2 + (centerline[..., 1] - y) ** 2)
+      (centerline[..., 0] - x[..., None]) ** 2 + (centerline[..., 1] - y[..., None]) ** 2)
     lookahead_distance = _MIN_LOOKAHEAD + v * lookahead_time
-    target_idx = jnp.argmin(jnp.abs(distances - lookahead_distance))
+    target_idx = jnp.argmin(
+      jnp.abs(distances - lookahead_distance[..., None]), axis=-1)
     
-    tx, ty = centerline[..., target_idx, 0], centerline[..., target_idx, 1]
+    agent_idx = jnp.arange(state.shape[0])
+    tx, ty = centerline[agent_idx, target_idx, 0], centerline[agent_idx, target_idx, 1]
     alpha = jnp.arctan2(ty - y, tx - x) - yaw
     delta = jnp.arctan2(
       2.0 * wheelbase * jnp.sin(alpha), lookahead_distance)

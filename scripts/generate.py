@@ -16,6 +16,7 @@ from ml4d.data.roadgraph import generate_roadgraph
 from ml4d.data.visualize import visualize
 from ml4d.data.teacher import generate_keeping_policy
 from ml4d.utils.transform import transform_roadgraph, transform_agents
+from ml4d.utils.unit import kph2mps
 
 
 # Suppress JAX logs below WARNING
@@ -61,7 +62,7 @@ def generate_batch(batch_size: int = 128) -> tuple[jax.Array, jax.Array]:
         batch_size=batch_size, 
         num_lanes=3, 
         lane_spacing=4.0, 
-        num_points=100
+        num_points=100,
     )
     logging.info("Roadgraphs generated.")
 
@@ -70,7 +71,7 @@ def generate_batch(batch_size: int = 128) -> tuple[jax.Array, jax.Array]:
     agents = generate_agents(
         key=key_agents, 
         roadgraph=roadgraph, 
-        num_objects=8
+        num_objects=32,
     )
     logging.info("Agents generated.")
 
@@ -81,7 +82,11 @@ def generate_batch(batch_size: int = 128) -> tuple[jax.Array, jax.Array]:
     logging.info("Transform completed.")
     
     # Generate keeping policy
-    policy = generate_keeping_policy(roadgraph, agents)
+    policy = generate_keeping_policy(
+        roadgraph=roadgraph, 
+        agents=agents,
+        speed_limit=kph2mps(50.0),
+    )
     
     return roadgraph, agents, policy
 
@@ -121,7 +126,12 @@ def main():
         # Plot the first batch
         key = random.PRNGKey(int(time.time()))
         batch_idx = random.randint(key, shape=(), minval=0, maxval=args.batch_size-1)
-        fig = visualize(roadgraph, agents, batch_index=2)
+        fig = visualize(
+            roadgraph=roadgraph, 
+            agents=agents, 
+            policy=policy, 
+            batch_index=batch_idx
+        )
 
         # Save the figure to a file instead of showing it
         plt.savefig(os.path.join(save_dir, f"batch_{batch_idx}.png"))

@@ -44,28 +44,3 @@ def follow(
         v * _TIME_HEADWAY + v * dv / (2.0 * jnp.sqrt(_MAX_ACCEL * _COMFORT_DECEL)))
     
     return _MAX_ACCEL * (1.0 - (v / v0) ** delta - (s_star / s) ** 2.0)
-
-
-@jax.jit
-def idm(v: jax.Array, 
-        v0: jax.Array, 
-        s: jax.Array, 
-        dv: jax.Array, 
-        delta: float = 4.0) -> jax.Array:
-    """
-    Compute command accelerations using IDM
-
-    Args:
-        v (jax.Array): Current speed
-        v0 (jax.Array): Desired speed
-        s (Optional[jax.Array], optional): distance to the front vehicle. 
-            Defaults to None.
-        dv (Optional[jax.Array], optional): speed difference to the front vehicle. 
-            Defaults to None.
-        delta (float, optional): acceleration decreasing rate. Defaults to 4.0.
-
-    Returns:
-        jax.Array: Acceleration commands
-    """
-    return jnp.where(
-        s is None, cruise(v, v0, delta), follow(v, v0, s, dv, delta))

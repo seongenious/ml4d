@@ -9,7 +9,7 @@ from ml4d.utils.geometry import compute_pairwise_overlaps
 def generate_agents(key: jax.random.PRNGKey,
                     roadgraph: jax.Array,
                     num_objects: int = 32, 
-                    noise: tuple = (0.5, 0.5, deg2rad(5.0)),
+                    noise: tuple = (2.0, 2.0, deg2rad(10.0)),
                     speed: tuple = (0, kph2mps(50)),
                     delta: tuple = (-deg2rad(10.0), deg2rad(10.0)),
                     accel: tuple = (-1, 1),
@@ -134,6 +134,7 @@ def generate_agents(key: jax.random.PRNGKey,
     # agents shape: (batch_size, num_objects, state_dim)
     # valid shape: (batch_size, num_objects, 1)
     valid = valid[..., None]  # (batch_size, num_objects, 1)
+    agents = agents * valid    
     agents = jnp.concatenate([agents, valid], axis=-1)
 
     return agents  # (batch_size, num_objects, state_dim + 1)
