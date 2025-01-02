@@ -7,12 +7,11 @@ from ml4d.utils.geometry import compute_pairwise_overlaps
 
 
 def generate_agents(key: jax.random.PRNGKey,
+                    batch_size: int,
                     roadgraph: jax.Array,
                     num_objects: int = 32, 
                     noise: tuple = (2.0, 2.0, deg2rad(10.0)),
                     speed: tuple = (0, kph2mps(50)),
-                    delta: tuple = (-deg2rad(10.0), deg2rad(10.0)),
-                    accel: tuple = (-1, 1),
                     length: tuple = (4.8, 5.2),
                     width: tuple = (1.8, 2.2)) -> jax.Array:
     """
@@ -33,10 +32,6 @@ def generate_agents(key: jax.random.PRNGKey,
             agent pose (±noise). Defaults to (0.1, 0.1, deg2rad(5.0)).
         speed (tuple, optional): A (min, max) tuple for the agent speeds 
             in m/s. Defaults to (0, kph2mps(50)).
-        delta (tuple, optional): A (min, max) tuple for the agent steering 
-            angle in radians. Defaults to (-deg2rad(10.0), deg2rad(10.0)).
-        accel (tuple, optional): A (min, max) tuple for the agent acceleration. 
-            Defaults to (-1, 1).
         length (tuple, optional): A (min, max) tuple for the agent length
             in meters. Defaults to (4.8, 5.2).
         width (tuple, optional): A (min, max) tuple for the agent width 
@@ -47,11 +42,10 @@ def generate_agents(key: jax.random.PRNGKey,
         where state_dim includes position (x, y), orientation (cos, sin), speed, 
         steering angle (delta), acceleration, length, width and validity
     """
-    batch_size, _, _, _ = roadgraph.shape
     flattened_points = roadgraph.reshape(batch_size, -1, 2) 
     # Shape: (batch_size, num_lanes * num_points, 2)
     
-    def generate_agents_per_batch(key: jax.random.PRNGKey, 
+    def generate_agents_per_batch(key: jax.random.PRNGKey,
                                   flattened_points: jax.Array) -> jax.Array:
         """
         Generate states for all agents in a single batch of roadgraph data.
@@ -67,8 +61,7 @@ def generate_agents(key: jax.random.PRNGKey,
             jax.Array: A 2D array of shape (num_objects, state_dim) 
             representing the generated agents.
         """
-        key, key_pose, key_speed, key_delta, key_accel, key_size = \
-            random.split(key, 6)
+        key, key_pose, key_speed, key_size = random.split(key, 4)
         
         # Sample unique positions for agents
         num_points = flattened_points.shape[0]
@@ -97,10 +90,6 @@ def generate_agents(key: jax.random.PRNGKey,
         # Generate random states for other attributes
         sampled_speed = random.uniform(
             key_speed, shape=(num_objects, 1), minval=speed[0], maxval=speed[1])
-        sampled_delta = random.uniform(
-            key_delta, shape=(num_objects, 1), minval=delta[0], maxval=delta[1])
-        sampled_accel = random.uniform(
-            key_accel, shape=(num_objects, 1), minval=accel[0], maxval=accel[1])
         sampled_length = random.uniform(
             key_size, shape=(num_objects, 1), minval=length[0], maxval=length[1])
         sampled_width = random.uniform(
@@ -112,11 +101,10 @@ def generate_agents(key: jax.random.PRNGKey,
             cos_h[:, None], 
             sin_h[:, None], 
             sampled_speed,
-            sampled_delta, 
-            sampled_accel,
             sampled_length, 
             sampled_width, 
         ])
+        
         return states
 
     # Use vmap to parallelize agent state generation across batches
@@ -136,5 +124,5 @@ def generate_agents(key: jax.random.PRNGKey,
     valid = valid[..., None]  # (batch_size, num_objects, 1)
     agents = agents * valid    
     agents = jnp.concatenate([agents, valid], axis=-1)
-
-    return agents  # (batch_size, num_objects, state_dim + 1)
+    
+    return agents  # (batch_size, num_objects, state_dim+1)

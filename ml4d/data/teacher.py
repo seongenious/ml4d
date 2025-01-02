@@ -1,10 +1,36 @@
 import jax
 import jax.numpy as jnp
+from jax import random
 
 from ml4d.sim.agent.policy import find_nearest_lane, find_front_vehicle
 from ml4d.sim.agent.idm import cruise, follow
 from ml4d.sim.agent.pure_pursuit import pure_pursuit
-from ml4d.utils.unit import kph2mps
+from ml4d.utils.unit import kph2mps, deg2rad
+
+
+def generate_init_policy(key: jax.random.PRNGKey,
+                         agents: jax.Array,
+                         delta: tuple = (deg2rad(-10.), deg2rad(10.)), 
+                         accel: tuple = (-2., 2.)) -> jax.Array:
+    key_delta, key_accel = random.split(key, 2)
+    
+    batch_size, num_objects, _ = agents.shape
+    
+    deltas = random.uniform(
+        key_delta, shape=(batch_size, num_objects,), minval=delta[0], maxval=delta[1])
+    accels = random.uniform(
+        key_accel, shape=(batch_size, num_objects,), minval=accel[0], maxval=accel[1])
+    
+    valid = agents[..., -1]
+    
+    deltas = deltas * valid
+    accels = accels * valid
+    
+    policy = jnp.stack([deltas, accels, valid], axis=-1)
+        
+    return policy
+    
+    
 
 def generate_keeping_policy(roadgraph: jax.Array,
                             agents: jax.Array,

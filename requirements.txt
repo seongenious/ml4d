@@ -17,3 +17,4 @@ highway-env
 yapf
 black
 isort
+imageio
