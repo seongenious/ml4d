@@ -261,7 +261,6 @@ def main():
         fig = visualize(
             roadgraph=roadgraph,
             agents=agents,
-            save_dir=os.path.join(save_dir, 'fig'),
         )
 
         # Save the figure to a file instead of showing it
