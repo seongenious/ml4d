@@ -2,13 +2,13 @@ import jax
 import jax.numpy as jnp
 
 
-_MIN_LOOKAHEAD = 5.0
+_MIN_LOOKAHEAD = 10.0
 
 @jax.jit
 def pure_pursuit(state: jax.Array, 
                  centerline: jax.Array, 
                  lookahead_time: float = 2.0,
-                 wheelbase: float = 3.0) -> float:
+                 wheelbase: float = 2.5) -> float:
     """Pure pursuit controller
 
     Args:

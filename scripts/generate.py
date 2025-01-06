@@ -17,9 +17,12 @@ from ml4d.data.agents import generate_agents
 from ml4d.data.roadgraph import generate_roadgraph
 from ml4d.data.visualize import visualize
 from ml4d.data.teacher import generate_init_policy, generate_keeping_policy
+from ml4d.sim.agent.policy import find_nearest_lane, find_front_vehicle
 from ml4d.utils.transform import transform_roadgraph, transform_agents
-from ml4d.utils.unit import kph2mps
+from ml4d.utils.unit import kph2mps, deg2rad
 
+
+WHEELBASE = 2.5
 
 # Suppress JAX logs below WARNING
 logging.getLogger("jax").setLevel(logging.WARNING)
@@ -58,15 +61,12 @@ def simulate(agents: jax.Array,
     y = agents[..., 1]
     cos_h = agents[..., 2]
     sin_h = agents[..., 3]
+    heading = jnp.arctan2(sin_h, cos_h)
     speed = agents[..., 4]
 
     # Teacher policy outputs
     delta = policy[..., 0]
     accel = policy[..., 1]
-    # If needed, you can also read policy[..., 2] (valid) to handle invalid updates.
-
-    # Recover heading angle from cos and sin 
-    heading = jnp.arctan2(sin_h, cos_h)
 
     # Simple bicycle model heading update
     # Update position (x, y)
@@ -74,9 +74,7 @@ def simulate(agents: jax.Array,
     new_y = y + speed * sin_h * dt
 
     # Recompute cos and sin of new heading
-    # For demonstration, we choose a wheelbase L = 2.5
-    L = 2.5
-    new_heading = heading + (speed / L) * jnp.tan(delta) * dt
+    new_heading = heading + (speed / WHEELBASE) * jnp.tan(delta) * dt
     new_cos_h = jnp.cos(new_heading)
     new_sin_h = jnp.sin(new_heading)
     
@@ -84,18 +82,19 @@ def simulate(agents: jax.Array,
     new_speed = jnp.maximum(speed + accel * dt, 0.)
 
     # Store the updated states back into the agent array
-    updated_agents = agents.at[..., 0].set(new_x)
-    updated_agents = updated_agents.at[..., 1].set(new_y)
-    updated_agents = updated_agents.at[..., 2].set(new_cos_h)
-    updated_agents = updated_agents.at[..., 3].set(new_sin_h)
-    updated_agents = updated_agents.at[..., 4].set(new_speed)
+    new_agents = agents
+    new_agents = new_agents.at[..., 0].set(new_x)
+    new_agents = new_agents.at[..., 1].set(new_y)
+    new_agents = new_agents.at[..., 2].set(new_cos_h)
+    new_agents = new_agents.at[..., 3].set(new_sin_h)
+    new_agents = new_agents.at[..., 4].set(new_speed)
     
-    return updated_agents
+    return new_agents
 
 
 def rollout(roadgraph: jax.Array,
-            init_agents: jax.Array,
-            init_policy: jax.Array,
+            agents: jax.Array,
+            policy: jax.Array,
             horizon: int = 30,
             dt: float = 0.2) -> tuple[jax.Array, jax.Array, jax.Array]:
     """
@@ -121,27 +120,28 @@ def rollout(roadgraph: jax.Array,
     agents_buffer = []
     policy_buffer = []
     
-    # Initialize roadgraph and agents
-    agents = init_agents
-    policy = init_policy
+    # Find lane index and front vehicle
+    lane_indices = find_nearest_lane(roadgraph, agents)
+    front_incides = find_front_vehicle(agents, lane_indices)
     
     for _ in tqdm(range(horizon), desc='Planning horizon', total=horizon, leave=False):
-        # Transform data
-        agents = transform_agents(agents)
-        
-        # Compute teacher policy (delta, accel)
-        policy = generate_keeping_policy(
-            roadgraph=roadgraph, 
-            agents=agents,
-            speed_limit=kph2mps(50.)
-        )
-
-        # Update agent states based on the policy
-        agents = simulate(agents, policy, dt=dt)
-
         # Store data
         agents_buffer.append(agents)
         policy_buffer.append(policy)
+        
+        # Update agent states based on the policy
+        agents = simulate(agents, policy, dt=dt)
+        
+        # Update teacher policy (delta, accel)
+        policy = generate_keeping_policy(
+            roadgraph=roadgraph, 
+            agents=agents,
+            lane_indices=lane_indices,
+            front_indices=front_incides,
+            lookahead_time=1.0,
+            wheelbase=WHEELBASE,
+            speed_limit=kph2mps(50.),
+        )
 
     # Stack along a new time axis
     rollout_agents = jnp.stack(agents_buffer, axis=1)
@@ -184,6 +184,9 @@ def generate_batch(batch_size: int = 128,
         num_lanes=3, 
         lane_spacing=4.0, 
         num_points=100,
+        position=(-2., 2.),
+        heading=(deg2rad(-10), deg2rad(10)),
+        curvature=(-0.005, 0.005),
     )
 
     # Generate initial agents
@@ -192,24 +195,31 @@ def generate_batch(batch_size: int = 128,
         batch_size=batch_size,
         roadgraph=init_roadgraph, 
         num_objects=32,
+        noise=(1.0, 1.0, deg2rad(5.0)),
+        speed=(kph2mps(20.), kph2mps(30.)),
+        length=(4.8, 5.2),
+        width=(1.8, 2.2),
     )
     
     # Generate initial policy
     init_policy = generate_init_policy(
         key=key_policy,
         agents=init_agents,
+        delta=(-deg2rad(0.), deg2rad(0.)),
+        accel=(-0., 0.),
     )
     
-    # Transform roadgraph
+    # Transform data
     roadgraph = transform_roadgraph(init_roadgraph, init_agents)
+    agents = transform_agents(init_agents)
     
     # Generate batched rollout data
     agents, policy = rollout(
-        roadgraph=roadgraph, 
-        init_agents=init_agents, 
-        init_policy=init_policy,
-        horizon=horizon, 
-        dt=dt
+        roadgraph=roadgraph,
+        agents=agents,
+        policy=init_policy,
+        horizon=horizon,
+        dt=dt,
     )
     
     return roadgraph, agents, policy
@@ -258,9 +268,11 @@ def main():
         # Plot the first batch
         key = random.PRNGKey(int(time.time()))
         batch_idx = random.randint(key, shape=(), minval=0, maxval=args.batch_size-1)
+        batch_idx = 819
         fig = visualize(
             roadgraph=roadgraph,
             agents=agents,
+            batch_idx=batch_idx,
         )
 
         # Save the figure to a file instead of showing it

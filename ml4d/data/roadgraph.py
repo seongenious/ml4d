@@ -60,7 +60,10 @@ def generate_roadgraph(key: jax.random.PRNGKey,
                        batch_size: int = 128,
                        num_lanes: int = 3,
                        lane_spacing: float = 4.0,
-                       num_points: int = 100) -> jax.Array:
+                       num_points: int = 100,
+                       position: tuple = (-0.0, 0.0),
+                       heading: tuple = (deg2rad(-0), deg2rad(0)),
+                       curvature: tuple = (-0.0, 0.0)) -> jax.Array:
     """
     Generates a batch of roadgraphs, each containing multiple parallel lanes.
     Each lane is represented by a centerline defined by a random start point
@@ -88,15 +91,15 @@ def generate_roadgraph(key: jax.random.PRNGKey,
     
     # Generate random start points for all batches and lanes
     start_points = random.uniform(
-        key_start, shape=(batch_size, 2), minval=-5.0, maxval=5.0)
+        key_start, shape=(batch_size, 2), minval=position[0], maxval=position[1])
     
     # Generate random heading angle for all batches and lanes
     heading_angles = random.uniform(
-        key_heading, shape=(batch_size,), minval=deg2rad(-10), maxval=deg2rad(10))
+        key_heading, shape=(batch_size,), minval=heading[0], maxval=heading[1])
 
     # Generate random curvatures for all batches and lanes
     curvatures = random.uniform(
-        key_curvature, shape=(batch_size,), minval=-0.03, maxval=0.03)
+        key_curvature, shape=(batch_size,), minval=curvature[0], maxval=curvature[1])
 
     # Map over batch dimension, Shape: (batch_size, num_lanes, num_points, 2)
     return jax.vmap(

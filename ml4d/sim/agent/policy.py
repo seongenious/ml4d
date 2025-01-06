@@ -22,7 +22,6 @@ def find_nearest_lane(roadgraph: jax.Array, agents: jax.Array) -> jax.Array:
     # agents[..., :2]: x,y position of agents (batch_size, num_objects, 2)
     # agents[..., -1]: valid flag (batch_size, num_objects)
     agent_positions = agents[..., :2]
-    valid_flags = agents[..., -1]  # (batch_size, num_objects)
 
     # roadgraph: (batch_size, num_lanes, num_points, 2)
     # Compute distances:
@@ -47,9 +46,6 @@ def find_nearest_lane(roadgraph: jax.Array, agents: jax.Array) -> jax.Array:
     min_dist_per_lane = jnp.min(dist, axis=-1)  # (batch, obj, num_lanes)
     # Then, argmin over lanes to find closest lane
     lane_idx = jnp.argmin(min_dist_per_lane, axis=-1)  # (batch, obj)
-
-    # For invalid agents, set lane_idx = -1
-    lane_idx = jnp.where(valid_flags > 0, lane_idx, -1)
 
     return lane_idx
 

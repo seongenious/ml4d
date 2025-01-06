@@ -10,10 +10,10 @@ def generate_agents(key: jax.random.PRNGKey,
                     batch_size: int,
                     roadgraph: jax.Array,
                     num_objects: int = 32, 
-                    noise: tuple = (2.0, 2.0, deg2rad(10.0)),
+                    noise: tuple = (0.0, 0.0, deg2rad(0.0)),
                     speed: tuple = (0, kph2mps(50)),
-                    length: tuple = (4.8, 5.2),
-                    width: tuple = (1.8, 2.2)) -> jax.Array:
+                    length: tuple = (5.0, 5.0),
+                    width: tuple = (2.0, 2.0)) -> jax.Array:
     """
     Generates agent states for a given batch of roadgraphs. 
     Each agent is placed at a random point along the roadgraph, 
@@ -61,18 +61,36 @@ def generate_agents(key: jax.random.PRNGKey,
             jax.Array: A 2D array of shape (num_objects, state_dim) 
             representing the generated agents.
         """
-        key, key_pose, key_speed, key_size = random.split(key, 4)
+        key, key_ego, key_pose, key_speed, key_size = random.split(key, 5)
         
-        # Sample unique positions for agents
-        num_points = flattened_points.shape[0]
-        sampled_indices = random.choice(
-            key_pose, num_points, shape=(num_objects,), replace=False)
+        # Sample unique position for ego agent
+        _, num_lanes, num_points, _ = roadgraph.shape
+        key_lane, key_ego_pose = random.split(key_ego)
+        first_lanes = random.randint(key_lane, shape=(), minval=0, maxval=num_lanes)
+        first_indices = first_lanes * num_points + random.randint(
+            key_ego_pose, shape=(), minval=0, maxval=5)
+        
+        # Sample unique positions for remaining agents
+        num_flattened_points = flattened_points.shape[0]
+        remaining_indices = random.choice(
+            key_pose,
+            num_flattened_points,
+            shape=(num_objects - 1,),
+            replace=False
+        )
+
+        sampled_indices = jnp.concatenate([
+            jnp.array([first_indices]), remaining_indices], axis=-1)
         
         # Generate random position
         key_position, key_heading = random.split(key_pose)
         sampled_position = flattened_points[sampled_indices]  # Shape: (num_objects, 2)
         position_noise = random.uniform(
-            key_position, shape=(num_objects, 2), minval=-jnp.array(noise[0:1]), maxval=jnp.array(noise[0:1]))
+            key_position, 
+            shape=(num_objects, 2), 
+            minval=-jnp.array(noise[0:1]), 
+            maxval=jnp.array(noise[0:1]),
+        )
         sampled_position = sampled_position + position_noise
         
         # Generate random heading angle
@@ -121,6 +139,7 @@ def generate_agents(key: jax.random.PRNGKey,
     # Stack valid column to agents
     # agents shape: (batch_size, num_objects, state_dim)
     # valid shape: (batch_size, num_objects, 1)
+    valid = valid.at[:, 0].set(1)  # zero agent always set true
     valid = valid[..., None]  # (batch_size, num_objects, 1)
     agents = agents * valid    
     agents = jnp.concatenate([agents, valid], axis=-1)

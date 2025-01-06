@@ -41,11 +41,13 @@ def visualize(roadgraph: np.ndarray,
         lane_points = single_roadgraph[lane_idx]
         x_coords = lane_points[:, 0]
         y_coords = lane_points[:, 1]
-        ax.plot(x_coords, y_coords, 
-                color=LIGHT_GRAY,
-                linewidth=1.2,
-                linestyle='--',
-                label=f"Lane {lane_idx}")
+        ax.plot(
+            x_coords, y_coords, 
+            color=LIGHT_GRAY,
+            linewidth=1.2,
+            linestyle='--',
+            # label=f"Lane {lane_idx}",
+        )
 
     # Generate rectangle corners for each agent
     horizon = agents.shape[1]
@@ -63,6 +65,7 @@ def visualize(roadgraph: np.ndarray,
             if agents[batch_idx, h, i, -1] == 0: continue
             
             edgecolor = GREEN if i == ego_index else RED
+            edgecolor = edgecolor + (1 - h / horizon, )
             linestyle = '-'
             
             # ac is (4, 2) array of corner points
@@ -75,11 +78,23 @@ def visualize(roadgraph: np.ndarray,
                 linestyle=linestyle
             )
             ax.add_patch(polygon)
+            
+            # Draw text only once
+            if h == 0:
+                ax.text(
+                    np.mean(ac[:, 0]), 
+                    np.mean(ac[:, 1]), 
+                    f"{i}",
+                    ha='center',
+                    va='center',
+                    color=edgecolor,
+                    fontsize=8,
+                )
 
     ax.set_xlabel("X Position")
     ax.set_ylabel("Y Position")
     ax.set_title(f"Roadgraph and Agents (Batch {batch_idx})")
-    ax.legend()
+    # ax.legend()
     ax.axis('equal')
     ax.grid(True)
 
