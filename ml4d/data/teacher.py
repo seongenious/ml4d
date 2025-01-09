@@ -5,6 +5,7 @@ from jax import random
 from ml4d.sim.agent.policy import find_nearest_lane, find_front_vehicle
 from ml4d.sim.agent.idm import cruise, follow
 from ml4d.sim.agent.pure_pursuit import pure_pursuit
+from ml4d.sim.agent.stanley import stanley
 from ml4d.utils.unit import kph2mps, deg2rad
 
 
@@ -38,7 +39,7 @@ def generate_init_policy(key: jax.random.PRNGKey,
 def generate_keeping_policy(roadgraph: jax.Array,
                             agents: jax.Array,
                             lane_indices: jax.Array,
-                            front_indices: jax.Array,
+                            target_indices: jax.Array,
                             lookahead_time: float = 2.0,
                             wheelbase: float = 2.5,
                             speed_limit: float = kph2mps(50.0)) -> jax.Array:
@@ -58,22 +59,27 @@ def generate_keeping_policy(roadgraph: jax.Array,
         Order: [delta (steering), accel (acceleration), valid]
     """
     # Compute delta and accel for all agents    
-    def compute_policy(roadgraph, agents, lane_indices, front_indices, speed_limit):
+    def compute_policy(roadgraph, agents, lane_indices, target_indices, speed_limit):
         # Steering angle (delta) computation
-        delta = pure_pursuit(
+        # delta = pure_pursuit(
+        #     state=agents, 
+        #     centerline=roadgraph[lane_indices],
+        #     lookahead_time=lookahead_time,
+        #     wheelbase=wheelbase,
+        # )
+        
+        delta = stanley(
             state=agents, 
             centerline=roadgraph[lane_indices],
-            lookahead_time=lookahead_time,
-            wheelbase=wheelbase,
         )
 
         # Acceleration (accel) computation
-        target = agents[front_indices]
+        target = agents[target_indices]
         s0 = jnp.sqrt(
             (target[..., 0] - agents[..., 0])**2 + (target[..., 1] - agents[..., 1])**2
         )
         accel = jnp.where(
-            front_indices != -1,
+            target_indices != -1,
             follow(
                 v=agents[..., 4],
                 v0=speed_limit,
@@ -96,7 +102,7 @@ def generate_keeping_policy(roadgraph: jax.Array,
             roadgraph, 
             agents,
             lane_indices,
-            front_indices,
+            target_indices,
             speed_limit,
         )
     valid = agents[..., -1]

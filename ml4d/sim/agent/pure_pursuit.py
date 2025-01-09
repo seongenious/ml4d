@@ -1,6 +1,8 @@
 import jax
 import jax.numpy as jnp
 
+from ml4d.utils.unit import mod2pi
+
 
 _MIN_LOOKAHEAD = 10.0
 
@@ -33,7 +35,7 @@ def pure_pursuit(state: jax.Array,
     
     agent_idx = jnp.arange(state.shape[0])
     tx, ty = centerline[agent_idx, target_idx, 0], centerline[agent_idx, target_idx, 1]
-    alpha = jnp.arctan2(ty - y, tx - x) - yaw
+    alpha = mod2pi(jnp.arctan2(ty - y, tx - x) - yaw)
     delta = jnp.arctan2(
       2.0 * wheelbase * jnp.sin(alpha), lookahead_distance)
     

@@ -19,7 +19,7 @@ from ml4d.data.visualize import visualize
 from ml4d.data.teacher import generate_init_policy, generate_keeping_policy
 from ml4d.sim.agent.policy import find_nearest_lane, find_front_vehicle
 from ml4d.utils.transform import transform_roadgraph, transform_agents
-from ml4d.utils.unit import kph2mps, deg2rad
+from ml4d.utils.unit import kph2mps, deg2rad, mod2pi
 
 
 WHEELBASE = 2.5
@@ -74,7 +74,7 @@ def simulate(agents: jax.Array,
     new_y = y + speed * sin_h * dt
 
     # Recompute cos and sin of new heading
-    new_heading = heading + (speed / WHEELBASE) * jnp.tan(delta) * dt
+    new_heading = mod2pi(heading + (speed / WHEELBASE) * jnp.tan(delta) * dt)
     new_cos_h = jnp.cos(new_heading)
     new_sin_h = jnp.sin(new_heading)
     
@@ -119,10 +119,13 @@ def rollout(roadgraph: jax.Array,
     # Buffers to store the rollout data at each time step
     agents_buffer = []
     policy_buffer = []
+    aux = dict()
     
     # Find lane index and front vehicle
     lane_indices = find_nearest_lane(roadgraph, agents)
-    front_incides = find_front_vehicle(agents, lane_indices)
+    target_indices = find_front_vehicle(agents, lane_indices)
+    aux['lane_indices'] = lane_indices
+    aux['target_indices'] = target_indices
     
     for _ in tqdm(range(horizon), desc='Planning horizon', total=horizon, leave=False):
         # Store data
@@ -137,7 +140,7 @@ def rollout(roadgraph: jax.Array,
             roadgraph=roadgraph, 
             agents=agents,
             lane_indices=lane_indices,
-            front_indices=front_incides,
+            target_indices=target_indices,
             lookahead_time=1.0,
             wheelbase=WHEELBASE,
             speed_limit=kph2mps(50.),
@@ -147,7 +150,7 @@ def rollout(roadgraph: jax.Array,
     rollout_agents = jnp.stack(agents_buffer, axis=1)
     rollout_policy = jnp.stack(policy_buffer, axis=1)
         
-    return rollout_agents, rollout_policy
+    return rollout_agents, rollout_policy, aux
 
 
 def generate_batch(batch_size: int = 128,
@@ -195,7 +198,7 @@ def generate_batch(batch_size: int = 128,
         batch_size=batch_size,
         roadgraph=init_roadgraph, 
         num_objects=32,
-        noise=(1.0, 1.0, deg2rad(5.0)),
+        noise=(1.0, 1.0, deg2rad(10.0)),
         speed=(kph2mps(20.), kph2mps(30.)),
         length=(4.8, 5.2),
         width=(1.8, 2.2),
@@ -214,15 +217,15 @@ def generate_batch(batch_size: int = 128,
     agents = transform_agents(init_agents)
     
     # Generate batched rollout data
-    agents, policy = rollout(
-        roadgraph=roadgraph,
-        agents=agents,
+    agents, policy, aux = rollout(
+        roadgraph=init_roadgraph,
+        agents=init_agents,
         policy=init_policy,
         horizon=horizon,
         dt=dt,
     )
     
-    return roadgraph, agents, policy
+    return roadgraph, agents, policy, aux
 
 
 def main():
@@ -245,7 +248,7 @@ def main():
     # Generate data
     logging.info(f"Starting data generation with batch size: {args.batch_size}")
     start_time = time.time()
-    roadgraph, agents, policy = generate_batch(
+    roadgraph, agents, policy, aux = generate_batch(
         batch_size=args.batch_size,
         horizon=args.horizon,
         dt=args.dt
@@ -268,11 +271,11 @@ def main():
         # Plot the first batch
         key = random.PRNGKey(int(time.time()))
         batch_idx = random.randint(key, shape=(), minval=0, maxval=args.batch_size-1)
-        batch_idx = 819
         fig = visualize(
             roadgraph=roadgraph,
             agents=agents,
             batch_idx=batch_idx,
+            aux=aux,
         )
 
         # Save the figure to a file instead of showing it

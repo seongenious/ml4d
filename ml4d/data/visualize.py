@@ -17,7 +17,8 @@ BLACK = (0, 0, 0)
 
 def visualize(roadgraph: np.ndarray, 
               agents: np.ndarray,
-              batch_idx: int = 0):
+              batch_idx: int = 0,
+              aux: dict = None):
     """
     Plots the roadgraph and agent positions for a given batch index.
 
@@ -46,11 +47,12 @@ def visualize(roadgraph: np.ndarray,
             color=LIGHT_GRAY,
             linewidth=1.2,
             linestyle='--',
-            # label=f"Lane {lane_idx}",
         )
 
     # Generate rectangle corners for each agent
     horizon = agents.shape[1]
+    lane_indices = aux['lane_indices'][batch_idx]
+    target_indices = aux['target_indices'][batch_idx]
     for h in range(horizon):
         temporal_agent = agents[batch_idx, h:h+1]
         agent_corners = agent2bbox(temporal_agent)  # (1, num_objects, 4, 2)
@@ -81,14 +83,16 @@ def visualize(roadgraph: np.ndarray,
             
             # Draw text only once
             if h == 0:
+                lane_idx = lane_indices[i]
+                target_idx = target_indices[i]
                 ax.text(
                     np.mean(ac[:, 0]), 
                     np.mean(ac[:, 1]), 
-                    f"{i}",
-                    ha='center',
+                    f"ID: {i}\nLane: {lane_idx}\nTarget: {target_idx}",
+                    ha='left',
                     va='center',
-                    color=edgecolor,
-                    fontsize=8,
+                    color=BLACK,
+                    fontsize=5,
                 )
 
     ax.set_xlabel("X Position")
