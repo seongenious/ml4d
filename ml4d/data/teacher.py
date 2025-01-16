@@ -40,8 +40,6 @@ def generate_keeping_policy(roadgraph: jax.Array,
                             agents: jax.Array,
                             lane_indices: jax.Array,
                             target_indices: jax.Array,
-                            lookahead_time: float = 2.0,
-                            wheelbase: float = 2.5,
                             speed_limit: float = kph2mps(50.0)) -> jax.Array:
     """
     Generate control input for lane keeping.
@@ -60,14 +58,7 @@ def generate_keeping_policy(roadgraph: jax.Array,
     """
     # Compute delta and accel for all agents    
     def compute_policy(roadgraph, agents, lane_indices, target_indices, speed_limit):
-        # Steering angle (delta) computation
-        # delta = pure_pursuit(
-        #     state=agents, 
-        #     centerline=roadgraph[lane_indices],
-        #     lookahead_time=lookahead_time,
-        #     wheelbase=wheelbase,
-        # )
-        
+        # Steering angle (delta) computation        
         delta = stanley(
             state=agents, 
             centerline=roadgraph[lane_indices],

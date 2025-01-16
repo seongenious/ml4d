@@ -95,6 +95,7 @@ def simulate(agents: jax.Array,
 def rollout(roadgraph: jax.Array,
             agents: jax.Array,
             policy: jax.Array,
+            speed_limit: float = kph2mps(50),
             horizon: int = 30,
             dt: float = 0.2) -> tuple[jax.Array, jax.Array, jax.Array]:
     """
@@ -141,9 +142,7 @@ def rollout(roadgraph: jax.Array,
             agents=agents,
             lane_indices=lane_indices,
             target_indices=target_indices,
-            lookahead_time=1.0,
-            wheelbase=WHEELBASE,
-            speed_limit=kph2mps(50.),
+            speed_limit=speed_limit,
         )
 
     # Stack along a new time axis
@@ -181,7 +180,7 @@ def generate_batch(batch_size: int = 128,
     key_roadgraph, key_agents, key_policy = random.split(key, 3)
 
     # Generate roadgraph
-    init_roadgraph = generate_roadgraph(
+    roadgraph = generate_roadgraph(
         key=key_roadgraph, 
         batch_size=batch_size, 
         num_lanes=3, 
@@ -193,13 +192,13 @@ def generate_batch(batch_size: int = 128,
     )
 
     # Generate initial agents
-    init_agents = generate_agents(
+    agents = generate_agents(
         key=key_agents, 
         batch_size=batch_size,
-        roadgraph=init_roadgraph, 
+        roadgraph=roadgraph, 
         num_objects=32,
-        noise=(1.0, 1.0, deg2rad(10.0)),
-        speed=(kph2mps(20.), kph2mps(30.)),
+        noise=(0.5, 0.5, deg2rad(5.0)),
+        speed=(kph2mps(10.), kph2mps(50.)),
         length=(4.8, 5.2),
         width=(1.8, 2.2),
     )
@@ -207,20 +206,21 @@ def generate_batch(batch_size: int = 128,
     # Generate initial policy
     init_policy = generate_init_policy(
         key=key_policy,
-        agents=init_agents,
+        agents=agents,
         delta=(-deg2rad(0.), deg2rad(0.)),
         accel=(-0., 0.),
     )
     
     # Transform data
-    roadgraph = transform_roadgraph(init_roadgraph, init_agents)
-    agents = transform_agents(init_agents)
+    # roadgraph = transform_roadgraph(init_roadgraph, init_agents)
+    # agents = transform_agents(init_agents)
     
     # Generate batched rollout data
     agents, policy, aux = rollout(
-        roadgraph=init_roadgraph,
-        agents=init_agents,
+        roadgraph=roadgraph,
+        agents=agents,
         policy=init_policy,
+        speed_limit=kph2mps(50),
         horizon=horizon,
         dt=dt,
     )
