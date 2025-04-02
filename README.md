@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 # **ML4D: Machine Learning for Autonomous Driving**
+=======
+# **ML4D: machine learning for autonomous driving**
+>>>>>>> ab2be52 (add docker file)
 
 **ML4D** is a project that integrates machine learning-based simulators, data generators, and motion planners for autonomous driving.
 
@@ -28,7 +32,11 @@ git clone https://github.com/seongenious/ml4d.git
 Build the docker image, then start and open a shell inside the running container:
 
 ```bash
+<<<<<<< HEAD
 ./docker.sh build | start | exec
+=======
+./docker.sh build | start | exec | jupyter
+>>>>>>> ab2be52 (add docker file)
 ```
 
 Stop and clean up the container:

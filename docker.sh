@@ -5,6 +5,7 @@
 IMAGE_NAME="ml4d-env"
 CONTAINER_NAME="ml4d-container"
 WORKSPACE_DIR="$(pwd)"
+DEFAULT_PORT=9999
 
 # Function to show help
 show_help() {
@@ -13,6 +14,7 @@ show_help() {
     echo "  build      Build the Docker image"
     echo "  start      Start the Docker container"
     echo "  exec       Execute a shell inside the running container"
+    echo "  jupyter     Run Jupyter Notebook server in the container"
     echo "  remove     Stop and remove the container"
     echo "  help       Show this help message"
 }
@@ -39,6 +41,17 @@ exec_shell() {
     docker exec -it $CONTAINER_NAME /bin/bash
 }
 
+# Function to run jupyter
+run_jupyter() {
+    echo "Starting Jupyter Notebook on http://localhost:$DEFAULT_PORT"
+    docker run --gpus all --rm -it \
+        --name $CONTAINER_NAME \
+        -v $WORKSPACE_DIR:/workspace \
+        -p $DEFAULT_PORT:$DEFAULT_PORT \
+        $IMAGE_NAME \
+        bash -c "cd /workspace && jupyter notebook --ip=0.0.0.0 --port=$DEFAULT_PORT --allow-root --NotebookApp.token='' --NotebookApp.password=''"
+}
+
 # Function to stop and remove the container
 remove_container() {
     echo "Stopping and removing container: $CONTAINER_NAME"
@@ -55,6 +68,9 @@ case "$1" in
         ;;
     exec)
         exec_shell
+        ;;
+    jupyter)
+        run_jupyter
         ;;
     remove)
         remove_container
