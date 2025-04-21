@@ -4,7 +4,7 @@
 
 IMAGE_NAME="ml4d-env"
 CONTAINER_NAME="ml4d-container"
-WORKSPACE_DIR="$(pwd)"
+WORKSPACE_DIR="/home/$USER"
 DEFAULT_PORT=9999
 
 # Function to show help
@@ -13,8 +13,8 @@ show_help() {
     echo "Commands:"
     echo "  build      Build the Docker image"
     echo "  start      Start the Docker container"
-    echo "  exec       Execute a shell inside the running container"
-    echo "  jupyter     Run Jupyter Notebook server in the container"
+    echo "  into       Execute a shell inside the running container"
+    echo "  jupyter    Run Jupyter Notebook server in the container"
     echo "  remove     Stop and remove the container"
     echo "  help       Show this help message"
 }
@@ -28,15 +28,18 @@ build_image() {
 # Function to start the Docker container
 start_container() {
     echo "Starting Docker container: $CONTAINER_NAME"
-    docker run --gpus all --rm -dit \
+    docker run -dit \
+        --gpus all \
+        -e DISPLAY=$DISPLAY \
+        -v /tmp/.X11-unix:/tmp/.X11-unix \
+        -v $WORKSPACE_DIR:/mnt \
         --name $CONTAINER_NAME \
-        -v $WORKSPACE_DIR:/workspace \
         $IMAGE_NAME
     echo "Container started."
 }
 
 # Function to execute a shell inside the container
-exec_shell() {
+into_shell() {
     echo "Opening a shell in the container: $CONTAINER_NAME"
     docker exec -it $CONTAINER_NAME /bin/bash
 }
@@ -44,18 +47,25 @@ exec_shell() {
 # Function to run jupyter
 run_jupyter() {
     echo "Starting Jupyter Notebook on http://localhost:$DEFAULT_PORT"
-    docker run --gpus all --rm -it \
-        --name $CONTAINER_NAME \
-        -v $WORKSPACE_DIR:/workspace \
+    docker run -it \
+        --gpus all \
+        -e DISPLAY=$DISPLAY \
+        -v /tmp/.X11-unix:/tmp/.X11-unix \
+        -v $WORKSPACE_DIR:/mnt \
         -p $DEFAULT_PORT:$DEFAULT_PORT \
+        --name $CONTAINER_NAME \
         $IMAGE_NAME \
-        bash -c "cd /workspace && jupyter notebook --ip=0.0.0.0 --port=$DEFAULT_PORT --allow-root --NotebookApp.token='' --NotebookApp.password=''"
+        bash -c "cd /mnt && jupyter notebook --ip=0.0.0.0 --port=$DEFAULT_PORT --allow-root --NotebookApp.token='' --NotebookApp.password=''"
 }
 
 # Function to stop and remove the container
 remove_container() {
     echo "Stopping and removing container: $CONTAINER_NAME"
-    docker stop $CONTAINER_NAME && docker rm $CONTAINER_NAME
+    if docker ps -a --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
+        docker stop $CONTAINER_NAME && docker rm $CONTAINER_NAME
+    else
+        echo "Container $CONTAINER_NAME does not exist."
+    fi
 }
 
 # Main script logic
@@ -66,8 +76,8 @@ case "$1" in
     start)
         start_container
         ;;
-    exec)
-        exec_shell
+    into)
+        into_shell
         ;;
     jupyter)
         run_jupyter
