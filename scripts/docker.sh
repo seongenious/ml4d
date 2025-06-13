@@ -10,18 +10,17 @@ show_help() {
     echo "Commands:"
     echo "  build      Build the Docker image"
     echo "  start      Start the Docker container"
+    echo "  jupyter    Start jupyterLab inside the container"
     echo "  exec       Execute a shell inside the running container"
     echo "  remove     Stop and remove the container"
     echo "  help       Show this help message"
 }
 
-# Function to build the Docker image
 build_image() {
     echo "Building Docker image: $IMAGE_NAME"
     docker build -t $IMAGE_NAME .
 }
 
-# Function to start the Docker container
 start_container() {
     echo "Starting Docker container: $CONTAINER_NAME"
     docker run -dit \
@@ -34,13 +33,19 @@ start_container() {
     echo "Container started."
 }
 
-# Function to execute a shell inside the container
+start_jupyter() {
+    echo "Launching JupyterLab on http://localhost:8888"
+    docker exec -d $CONTAINER_NAME jupyter lab \
+        --ip=0.0.0.0 --no-browser --allow-root \
+        --NotebookApp.token='' --NotebookApp.password=''
+    echo "JupyterLab launched."
+}
+
 into_shell() {
     echo "Opening a shell in the container: $CONTAINER_NAME"
     docker exec -it $CONTAINER_NAME /bin/bash
 }
 
-# Function to stop and remove the container
 remove_container() {
     echo "Stopping and removing container: $CONTAINER_NAME"
     if docker ps -a --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
@@ -57,6 +62,9 @@ case "$1" in
         ;;
     start)
         start_container
+        ;;
+    jupyter)
+        start_jupyter
         ;;
     exec)
         into_shell

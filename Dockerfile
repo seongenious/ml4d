@@ -21,7 +21,7 @@ RUN pip install --upgrade pip setuptools wheel
 # 2. Install Required Packages
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # Install numpy
-RUN pip install numpy==1.24.4
+RUN pip install numpy==1.23.5
 
 # nuScenes SDK
 RUN pip install nuscenes-devkit
@@ -32,6 +32,9 @@ RUN pip install waymo-open-dataset-tf-2-12-0==1.6.7
 # Jax with CUDA
 RUN pip install --upgrade "jax[cuda11_pip]" \
     -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+
+# Jupyter
+RUN pip install jupyterlab ipywidgets
 
 # Other Requirements
 COPY requirements.txt .
