@@ -28,15 +28,14 @@ git clone https://github.com/seongenious/ml4d.git
 Build the docker image, then start and open a shell inside the running container:
 
 ```bash
-./docker.sh build | start | exec | jupyter
+./scripts/docker.sh build | start | exec
 ```
 
 Stop and clean up the container:
 
 ```bash
-./docker.sh remove
+./scripts/docker.sh remove
 ```
-
 
 ## **Getting Started**
 
