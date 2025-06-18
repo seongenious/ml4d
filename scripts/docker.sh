@@ -3,6 +3,7 @@
 IMAGE_NAME="ml4d-env"
 CONTAINER_NAME="ml4d-container"
 WORKSPACE_DIR="/home/$USER"
+DEFAULT_PORT=9999
 
 # Function to show help
 show_help() {
@@ -28,15 +29,16 @@ start_container() {
         -e DISPLAY=$DISPLAY \
         -v /tmp/.X11-unix:/tmp/.X11-unix \
         -v $WORKSPACE_DIR:/mnt \
+        -p $DEFAULT_PORT:$DEFAULT_PORT \
         --name $CONTAINER_NAME \
         $IMAGE_NAME
     echo "Container started."
 }
 
 start_jupyter() {
-    echo "Launching JupyterLab on http://localhost:8888"
+    echo "Launching JupyterLab on http://localhost:$DEFAULT_PORT"
     docker exec -d $CONTAINER_NAME jupyter lab \
-        --ip=0.0.0.0 --no-browser --allow-root \
+        --ip=0.0.0.0 --port=$DEFAULT_PORT --no-browser --allow-root \
         --NotebookApp.token='' --NotebookApp.password=''
     echo "JupyterLab launched."
 }
