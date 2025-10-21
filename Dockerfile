@@ -1,5 +1,5 @@
-# Base image: NVIDIA CUDA 11.8 + cuDNN 8 + Ubuntu 20.04
-FROM nvidia/cuda:11.8.0-cudnn8-devel-ubuntu20.04
+# Base image
+FROM pytorch/pytorch:2.4.0-cuda12.1-cudnn9-devel
 
 # Set non-interactive mode
 ENV DEBIAN_FRONTEND=noninteractive
@@ -8,10 +8,9 @@ ENV DEBIAN_FRONTEND=noninteractive
 # 1. Install System Packages
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3.8 python3.8-venv python3.8-dev python3-pip \
-    build-essential wget curl git unzip vim tmux nano ffmpeg \
+    build-essential git wget unzip curl vim tmux nano \
+    ffmpeg libgl1 libglib2.0-0 python3-opencv \
     libgl1-mesa-glx libglib2.0-0 x11-apps \
-    && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
 # Upgrade pip, setuptools, and wheel
@@ -20,33 +19,26 @@ RUN pip install --upgrade pip setuptools wheel
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # 2. Install Required Packages
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-# Install numpy
-RUN pip install numpy==1.23.5
+RUN pip install --no-cache-dir "numpy==1.26.4" "matplotlib<3.8"
+
+RUN pip install \
+    scipy pandas pyyaml \
+    torchmetrics lightning==2.4.0 accelerate==1.0.1 \
+    timm==1.0.9 einops==0.8.0 \
+    transformers==4.44.2 sentencepiece==0.2.0 \
+    opencv-python-headless==4.10.0.84 \
+    albumentations==1.4.14 pycocotools==2.0.8
 
 # nuScenes SDK
-RUN pip install nuscenes-devkit
+RUN pip install nuscenes-devkit==1.1.11 mlflow==2.16.0
 
-# Waymo Open Dataset
-RUN pip install waymo-open-dataset-tf-2-12-0==1.6.7
+RUN pip install --no-build-isolation flash-attn==2.6.3 || true
 
-# Jax with CUDA
-RUN pip install --upgrade "jax[cuda11_pip]" \
-    -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+# numpy and matplotlib are installed again to avoid version conflicts
+RUN pip install --no-cache-dir "numpy==1.26.4" "matplotlib<3.8"
 
-# Jupyter
-RUN pip install jupyterlab ipywidgets
+ENV TOKENIZERS_PARALLELISM=false \
+    PYTHONUNBUFFERED=1 \
+    CUDA_DEVICE_MAX_CONNECTIONS=1
 
-# Other Requirements
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-# 3. Setup Workspace
-# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-WORKDIR /mnt
-COPY . .
-
-# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-# 4. Set Default Command
-# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-CMD ["bash"]
+WORKDIR /workspace

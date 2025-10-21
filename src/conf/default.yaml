@@ -1,0 +1,31 @@
+data:
+  dataset: nuscenes
+  root: /workspace/data/nuscenes
+  seq_len: 6
+  cameras: [CAM_FRONT, CAM_FRONT_RIGHT, CAM_FRONT_LEFT, CAM_BACK, CAM_BACK_LEFT, CAM_BACK_RIGHT]
+  img_size: [224, 224]
+  batch_size: 8
+  num_workers: 8
+
+model:
+  vision_backbone: efficientnet_b1
+  film: true
+  tokenlearner_tokens_per_frame: 2
+  transformer_layers: 8
+  d_model: 512
+  n_heads: 8
+
+action:
+  steer_bins: 12
+  accel_bins: 12
+  blinker_bins: 2
+
+optim:
+  lr: 2.0e-4
+  weight_decay: 1.0e-4
+  amp: true
+
+logging:
+  exp_name: rt1_av_lane_keep_poc
+  log_dir: /workspace/logs
+  ckpt_dir: /workspace/checkpoints

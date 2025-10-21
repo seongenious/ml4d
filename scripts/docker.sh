@@ -2,8 +2,8 @@
 # Shell script for managing the ML4D Docker container
 IMAGE_NAME="ml4d-env"
 CONTAINER_NAME="ml4d-container"
-WORKSPACE_DIR="/home/$USER"
-DEFAULT_PORT=9999
+WORKSPACE_DIR="/workspace"
+DEFAULT_PORT=5000
 
 # Function to show help
 show_help() {
@@ -11,7 +11,6 @@ show_help() {
     echo "Commands:"
     echo "  build      Build the Docker image"
     echo "  start      Start the Docker container"
-    echo "  jupyter    Start jupyterLab inside the container"
     echo "  exec       Execute a shell inside the running container"
     echo "  remove     Stop and remove the container"
     echo "  help       Show this help message"
@@ -24,23 +23,21 @@ build_image() {
 
 start_container() {
     echo "Starting Docker container: $CONTAINER_NAME"
-    docker run -dit \
-        --gpus all \
+    docker run -dit --gpus all \
+        --shm-size=16g \
         -e DISPLAY=$DISPLAY \
         -v /tmp/.X11-unix:/tmp/.X11-unix \
-        -v $WORKSPACE_DIR:/mnt \
+        -v ~/data/sets/nuscenes:/workspace/data/nuscenes \
+        -v ~/git/ml4d/src:$WORKSPACE_DIR/src \
+        -v ~/git/ml4d/data:$WORKSPACE_DIR/data \
+        -v ~/git/ml4d/checkpoints:$WORKSPACE_DIR/checkpoints \
+        -v ~/git/ml4d/logs:$WORKSPACE_DIR/logs \
+        -v ~/git/ml4d/mlruns:$WORKSPACE_DIR/mlruns \
+        -v ~/git/ml4d/scripts:$WORKSPACE_DIR/scripts \
         -p $DEFAULT_PORT:$DEFAULT_PORT \
         --name $CONTAINER_NAME \
         $IMAGE_NAME
     echo "Container started."
-}
-
-start_jupyter() {
-    echo "Launching JupyterLab on http://localhost:$DEFAULT_PORT"
-    docker exec -d $CONTAINER_NAME jupyter lab \
-        --ip=0.0.0.0 --port=$DEFAULT_PORT --no-browser --allow-root \
-        --NotebookApp.token='' --NotebookApp.password=''
-    echo "JupyterLab launched."
 }
 
 into_shell() {
@@ -64,9 +61,6 @@ case "$1" in
         ;;
     start)
         start_container
-        ;;
-    jupyter)
-        start_jupyter
         ;;
     exec)
         into_shell

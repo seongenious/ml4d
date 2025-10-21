@@ -9,6 +9,8 @@ __pycache__/
 # Distribution / packaging
 .Python
 build/
+data/nuscenes/
+data/train/
 develop-eggs/
 dist/
 downloads/
