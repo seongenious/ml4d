@@ -353,10 +353,10 @@ def create_scene_videos(wds_pattern: str, output_dir: str = "/workspace/data/tra
                         cv2.line(front_img, 
                                 (int(u_coords[i]), int(v_coords[i])), 
                                 (int(u_coords[i+1]), int(v_coords[i+1])), 
-                                (255, 0, 0), 2)
+                                (0, 0, 255), 2)
+                        cv2.circle(front_img, (int(u_coords[i]), int(v_coords[i])), 3, (0, 0, 255), -1)
                     
-                    cv2.circle(front_img, (int(u_coords[0]), int(v_coords[0])), 6, (0, 255, 0), -1)
-                    cv2.circle(front_img, (int(u_coords[-1]), int(v_coords[-1])), 6, (0, 0, 255), -1)
+                    cv2.circle(front_img, (int(u_coords[-1]), int(v_coords[-1])), 3, (0, 0, 255), -1)
                 
                 # Update camera image with trajectory
                 top_row = np.concatenate([imgs[t][0], front_img, imgs[t][2]], axis=1)
