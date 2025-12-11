@@ -40,3 +40,9 @@ Stop and clean up the container:
 ## **Getting Started**
 
 ## **Contact**
+
+```
+conda create -n ml4d python==3.12
+
+ln -s ~/data/sets/nuscenes/ ./data/
+```

@@ -238,12 +238,12 @@ def show_sample_from_wds(
 
     fig.suptitle(f"Prompt: {prompt}", fontsize=12)
     plt.tight_layout()
-    plt.savefig('/workspace/data/train/output.png', dpi=150, bbox_inches='tight')
-    print("✅ Visualization saved to /workspace/data/train/output.png")
+    plt.savefig('./data/train/output.png', dpi=150, bbox_inches='tight')
+    print("✅ Visualization saved to ./data/train/output.png")
     plt.close()
 
 
-def create_scene_videos(wds_pattern: str, output_dir: str = "/workspace/data/train/videos"):
+def create_scene_videos(wds_pattern: str, output_dir: str = "./data/train/videos"):
     """Create videos for each scene showing all frames with trajectory overlay.
     
     Args:
@@ -436,8 +436,10 @@ def create_bev_trajectory_plot(meta: dict, height: int, width: int) -> np.ndarra
     
     # Convert plot to numpy array
     fig.canvas.draw()
-    buf = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
-    buf = buf.reshape(fig.canvas.get_width_height()[::-1] + (3,))
+    buf = np.frombuffer(fig.canvas.buffer_rgba(), dtype=np.uint8)
+    buf = buf.reshape(fig.canvas.get_width_height()[::-1] + (4,))
+    # Convert RGBA to RGB
+    buf = buf[:, :, :3]
     
     plt.close(fig)
     
@@ -448,5 +450,5 @@ def create_bev_trajectory_plot(meta: dict, height: int, width: int) -> np.ndarra
 
 
 if __name__ == "__main__":
-    show_sample_from_wds("/workspace/data/train/00000.tar", T=4, K=6)
-    create_scene_videos("/workspace/data/train/00000.tar")
+    show_sample_from_wds("./data/train/00000.tar", T=4, K=6)
+    create_scene_videos("./data/train/00000.tar")

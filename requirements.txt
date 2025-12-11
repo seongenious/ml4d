@@ -12,3 +12,5 @@ pandas>=1.4.0
 seaborn>=0.11.0
 jupyter>=1.0.0
 ipykernel>=6.15.0
+timm>=0.9.0
+pyquaternion>=0.9.0

@@ -11,6 +11,46 @@ from nuscenes.nuscenes import NuScenes
 from nuscenes.utils.splits import create_splits_scenes
 from pyquaternion import Quaternion
 
+# Import rectification functions from tutorial
+# We'll define them here to avoid import path issues
+def quaternion_to_rotation_matrix(quaternion: list) -> np.ndarray:
+    """Quaternion [w, x, y, z]을 rotation matrix로 변환."""
+    q = Quaternion(quaternion)
+    return q.rotation_matrix
+
+
+def compute_rectification_maps(
+    K: np.ndarray,
+    D: Optional[np.ndarray] = None,
+    image_size: Tuple[int, int] = (1600, 900),
+    alpha: float = 0.0
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Rectification 맵 계산."""
+    width, height = image_size
+    
+    if D is None:
+        D = np.zeros(5, dtype=np.float32)
+    
+    new_K, roi = cv2.getOptimalNewCameraMatrix(
+        K, D, (width, height), alpha, (width, height)
+    )
+    
+    map1, map2 = cv2.initUndistortRectifyMap(
+        K, D, None, new_K, (width, height), cv2.CV_32FC1
+    )
+    
+    return map1, map2, new_K
+
+
+def rectify_image(
+    image: np.ndarray,
+    map1: np.ndarray,
+    map2: np.ndarray,
+    interpolation: int = cv2.INTER_LINEAR
+) -> np.ndarray:
+    """이미지 rectification 적용."""
+    return cv2.remap(image, map1, map2, interpolation)
+
 
 def quat_to_yaw(quaternion: List[float]) -> float:
     """Convert quaternion to yaw angle.
@@ -126,6 +166,8 @@ class NuScenesExtractor:
         wheelbase: float = 2.7,
         jpg_quality: int = 90,
         time_tolerance_ms: int = 120,
+        enable_rectification: bool = True,
+        rectification_alpha: float = 0.0,
     ):
         """Initialize NuScenes extractor.
         
@@ -143,6 +185,8 @@ class NuScenesExtractor:
             wheelbase: Vehicle wheelbase in meters.
             jpg_quality: JPEG compression quality.
             time_tolerance_ms: Time tolerance for frame matching in milliseconds.
+            enable_rectification: Whether to apply image rectification.
+            rectification_alpha: Free scaling parameter for rectification (0=no black borders, 1=all pixels valid).
         """
         self.nuscenes_root = nuscenes_root
         self.out_dir = out_dir
@@ -155,6 +199,8 @@ class NuScenesExtractor:
         self.wheelbase = wheelbase
         self.jpg_quality = jpg_quality
         self.time_tolerance_us = time_tolerance_ms * 1000
+        self.enable_rectification = enable_rectification
+        self.rectification_alpha = rectification_alpha
         
         self.cameras = [
             "CAM_FRONT_LEFT", "CAM_FRONT", "CAM_FRONT_RIGHT",
@@ -169,6 +215,10 @@ class NuScenesExtractor:
         self.nusc = NuScenes(version="v1.0-mini", dataroot=nuscenes_root, verbose=True)
         self.split_scenes = set(create_splits_scenes()[split])
         self.scenes = [s for s in self.nusc.scene if s["name"] in self.split_scenes]
+        
+        # Rectification maps (will be initialized lazily per camera)
+        self.rectification_maps = {}  # {camera_name: (map1, map2)}
+        self.camera_calibrations = {}  # {camera_name: calib_dict}
     
     def extract_shards(self, max_samples_per_shard: int = 5000, verbose_every: int = 1000):
         """Extract and save data shards.
@@ -352,6 +402,10 @@ class NuScenesExtractor:
                 if img is None:
                     return None
                 
+                # Apply rectification if enabled
+                if self.enable_rectification:
+                    img = self._apply_rectification(img, cam, sample)
+                
                 # Flip rear-facing cameras horizontally
                 if cam in ["CAM_BACK", "CAM_BACK_LEFT", "CAM_BACK_RIGHT"]:
                     img = cv2.flip(img, 1)  # 1 = horizontal flip
@@ -520,19 +574,24 @@ class NuScenesExtractor:
         
         sink.write(sample_data)
     
-    def _get_camera_calibration(self, sample: Dict) -> Dict:
-        """Extract camera calibration parameters for CAM_FRONT.
+    def _get_camera_calibration(self, sample: Dict, camera_name: Optional[str] = None) -> Dict:
+        """Extract camera calibration parameters for a camera.
         
         Args:
             sample: nuScenes sample object.
+            camera_name: Camera name (default: CAM_FRONT).
             
         Returns:
             Dictionary containing camera calibration parameters.
         """
+        if camera_name is None:
+            camera_name = "CAM_FRONT"
+        
         try:
-            # Get CAM_FRONT sample data
-            front_cam = "CAM_FRONT"
-            sd_token = sample["data"][front_cam]
+            sd_token = sample["data"].get(camera_name, None)
+            if sd_token is None:
+                raise ValueError(f"Camera {camera_name} not found in sample")
+            
             sd = self.nusc.get("sample_data", sd_token)
             
             # Get calibrated sensor
@@ -543,7 +602,7 @@ class NuScenesExtractor:
             intrinsic = calib["camera_intrinsic"]
             
             return {
-                "camera_name": front_cam,
+                "camera_name": camera_name,
                 "intrinsic_matrix": intrinsic,
                 "translation": calib["translation"],
                 "rotation": calib["rotation"],
@@ -551,16 +610,80 @@ class NuScenesExtractor:
                 "original_image_size": [sd["width"], sd["height"]]  # [width, height]
             }
         except Exception as e:
-            print(f"Warning: Could not extract camera calibration: {e}")
+            print(f"Warning: Could not extract camera calibration for {camera_name}: {e}")
             # Return default calibration
             return {
-                "camera_name": "CAM_FRONT",
+                "camera_name": camera_name,
                 "intrinsic_matrix": [[1000, 0, 112], [0, 1000, 112], [0, 0, 1]],
                 "translation": [0, 0, 0],
                 "rotation": [1, 0, 0, 0],
                 "sensor_token": None,
                 "original_image_size": [1600, 900]  # Default size
             }
+    
+    def _get_rectification_maps(self, camera_name: str, sample: Dict) -> Optional[Tuple[np.ndarray, np.ndarray]]:
+        """Get or compute rectification maps for a camera.
+        
+        Args:
+            camera_name: Camera name.
+            sample: nuScenes sample object (used to get calibration if not cached).
+            
+        Returns:
+            Tuple of (map1, map2) or None if failed.
+        """
+        # Check if maps are already computed
+        if camera_name in self.rectification_maps:
+            return self.rectification_maps[camera_name]
+        
+        # Get calibration
+        if camera_name not in self.camera_calibrations:
+            self.camera_calibrations[camera_name] = self._get_camera_calibration(sample, camera_name)
+        
+        calib = self.camera_calibrations[camera_name]
+        
+        try:
+            # Extract camera matrix
+            K = np.array(calib["intrinsic_matrix"], dtype=np.float32)
+            image_size = tuple(calib["original_image_size"])  # (width, height)
+            
+            # nuScenes cameras typically have minimal distortion, but we'll handle it
+            D = np.zeros(5, dtype=np.float32)
+            
+            # Compute rectification maps
+            map1, map2, _ = compute_rectification_maps(
+                K, D, image_size, alpha=self.rectification_alpha
+            )
+            
+            # Cache the maps
+            self.rectification_maps[camera_name] = (map1, map2)
+            return (map1, map2)
+            
+        except Exception as e:
+            print(f"Warning: Could not compute rectification maps for {camera_name}: {e}")
+            return None
+    
+    def _apply_rectification(self, image: np.ndarray, camera_name: str, sample: Dict) -> np.ndarray:
+        """Apply rectification to an image.
+        
+        Args:
+            image: Input BGR image.
+            camera_name: Camera name.
+            sample: nuScenes sample object.
+            
+        Returns:
+            Rectified image (or original if rectification fails).
+        """
+        maps = self._get_rectification_maps(camera_name, sample)
+        if maps is None:
+            return image
+        
+        map1, map2 = maps
+        try:
+            rectified = rectify_image(image, map1, map2)
+            return rectified
+        except Exception as e:
+            print(f"Warning: Could not apply rectification to {camera_name}: {e}")
+            return image
 
 
 def test_file_saving():
@@ -575,7 +698,7 @@ def test_file_saving():
     try:
         # Test with a small configuration
         extractor = NuScenesExtractor(
-            nuscenes_root="/workspace/data/nuscenes/v1.0-mini",
+            nuscenes_root="./data/nuscenes/v1.0-mini",
             out_dir=temp_dir,
             split="train",
             input_frames=2,  # Reduced for testing
@@ -615,8 +738,8 @@ def test_file_saving():
 
 def main():
     """Main function to run the extractor."""
-    dataroot = "/workspace/data/nuscenes/v1.0-mini"
-    output_dir = "/workspace/data"
+    dataroot = "./data/nuscenes/v1.0-mini"
+    output_dir = "./data"
     
     extractor = NuScenesExtractor(
         nuscenes_root=dataroot,
