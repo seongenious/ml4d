@@ -1,6 +1,5 @@
 torch
 torchvision
-numpy
 opencv-python
 matplotlib
 tqdm
@@ -14,5 +13,5 @@ jupyter
 ipykernel
 timm
 pyquaternion
-nuscenes-devkit
-webdataset
+# nuscenes-devkit
+# webdataset
