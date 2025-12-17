@@ -77,25 +77,39 @@ class NuScenesDataloader:
 
         # Extract train and val scenes
         train_infos = []
+        failed_train_scenes = 0
         for scene_token in tqdm(train_scenes, desc='Extracting train scenes'):
             scene = self.nusc.get('scene', scene_token)
             samples = self._extract_scene(scene)
+            if len(samples) == 0:
+                print(f'No samples found for train scene {scene['name']}')
+                failed_train_scenes += 1
+                continue
             train_infos.append(samples)
         self.train_scenes = train_infos
-
+        print(f'Total {len(train_scenes)} train scenes, {failed_train_scenes} failed')
+        
         val_infos = []
+        failed_val_scenes = 0
         for scene_token in tqdm(val_scenes, desc='Extracting val scenes'):
             scene = self.nusc.get('scene', scene_token)
             samples = self._extract_scene(scene)
-            val_infos.append(samples)
+            if len(samples) == 0:
+                print(f'No samples found for valscene {scene['name']}')
+                failed_val_scenes += 1
+                continue
+                val_infos.append(samples)
         self.val_scenes = val_infos
+        print(f'Total {len(val_scenes)} val scenes, {failed_val_scenes} failed')
 
     def _extract_scene(self, scene: Any) -> List[Dict]:
         samples = []
         sample = self.nusc.get('sample', scene['first_sample_token'])
+        failed_samples = 0
         while sample is not None:
             data = self._extract_sample(sample)
-            samples.append(data)
+            if data is not None:
+                samples.append(data)
             if sample['token'] != scene['last_sample_token']:
                 sample = self.nusc.get('sample', sample['next'])
             else:
@@ -107,6 +121,7 @@ class NuScenesDataloader:
 
         # Get lidar data for annotation transform to global frame
         lidar_token = sample['data']['LIDAR_TOP']
+        self.nusc.render_sample_data(lidar_token)
         lidar_rec = self.nusc.get('sample_data', lidar_token)
         ego_rec = self.nusc.get('ego_pose', lidar_rec['ego_pose_token'])
         cs_rec = self.nusc.get(
@@ -123,14 +138,24 @@ class NuScenesDataloader:
         data['timestamp'] = lidar_rec['timestamp']
         data['translation'] = ego_rec['translation']
         data['rotation'] = ego_rec['rotation']
+        data['token'] = {'LIDAR_TOP': lidar_token}
 
         # Get camera images
         data['sensor'] = {}
+        image_exists = True
         for cam in CAMERAS:
             cam_token = sample['data'][cam]
+            self.nusc.render_sample_data(cam_token)
             cam_rec = self.nusc.get('sample_data', cam_token)
             calib_rec = self.nusc.get(
                 'calibrated_sensor', cam_rec['calibrated_sensor_token'])
+            
+            if not os.path.exists(
+                os.path.join(self.nusc.dataroot, cam_rec['filename'])):
+                image_exists = False
+                break
+            
+            data['token'][cam] = cam_token
             data['sensor'][cam] = {
                 'intrinsic': calib_rec['camera_intrinsic'],
                 'translation': calib_rec['translation'],
@@ -139,6 +164,9 @@ class NuScenesDataloader:
                 'img_path': os.path.join(
                     self.nusc.dataroot, cam_rec['filename'])
             }
+        
+        if not image_exists:
+            return None
 
         # Get object annotations
         data['label'] = {}
